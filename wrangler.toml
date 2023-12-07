@@ -1,0 +1,17 @@
+name = "proxy"
+main = "src/index.js"
+compatibility_date = "2023-12-01"
+
+# Variable bindings. These are arbitrary, plaintext strings (similar to environment variables)
+# Note: Use secrets to store sensitive data.
+# Docs: https://developers.cloudflare.com/workers/platform/environment-variables
+[vars]
+SYS_SECRERT = "ozshen"
+ENABLE_ADAPTER = 0
+AZURE_RESOURCE = ""
+
+# Bind a KV Namespace. Use KV as persistent storage for small key-value pairs.
+# Docs: https://developers.cloudflare.com/kv/get-started/#create-a-kv-namespace-via-wrangler
+[[kv_namespaces]]
+binding = "KV"
+id = "adc03a7282b3442e95420154c63321a9"
