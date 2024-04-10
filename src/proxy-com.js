@@ -2,7 +2,7 @@ const APIPaths = {
   sysctl: "sysctl",
   openai: "openai",
   azure: "azure",
-  palm: "palm",
+  gemini: "gemini",
 };
 
 async function listUser(env, params) {
@@ -77,7 +77,7 @@ async function generatePKey() {
 }
 
 //verify user's pkey
-async function verifyPkey(request, env) {
+async function verifyPath(request, env) {
   const url = new URL(request.url);
   url.pathname = url.pathname.replace("//", "/");
   const [_, p1, p2, ...params] = url.pathname.split("/");
@@ -94,25 +94,33 @@ async function verifyPkey(request, env) {
         throw "invalid uac pkey";
       }
       console.log(`pkey: ${uacpkey}`);
+      
     } else {
-      // format pathname
-      url.pathname = [_, p2, ...params].join("/");
 
-      // verify uac
-      const users = (await env.KV.get("users", { type: "json" })) || {};
-      if (users) {
-        let uname = url.host;
-        var ulist = Object.keys(users);
-        if (ulist.length > 0) {
-          if (!users[uname]) throw "invalid uac name";
-          if (!uacpkey) throw "invalid uac pkey";
-          if (uacpkey.toLowerCase() != users[uname].key.toLowerCase()) throw "uac pkey required";
+      if(env?.KV){
+        // format pathname
+        url.pathname = [_, p2, ...params].join("/");
 
-          console.log(`name ${uname} acepted, pkey: ${uacpkey}`);
-          // format pathname
-          url.pathname = [_, ...params].join("/");
+        // verify uac
+        const users = (await env.KV.get("users", { type: "json" })) || {};
+        if (users) {
+          let uname = url.host;
+          var ulist = Object.keys(users);
+          if (ulist.length > 0) {
+            if (!users[uname]) throw "invalid uac name";
+            if (!uacpkey) throw "invalid uac pkey";
+            if (uacpkey.toLowerCase() != users[uname].key.toLowerCase()) throw "uac pkey required";
+
+            console.log(`name ${uname} acepted, pkey: ${uacpkey}`);
+            // format pathname
+            url.pathname = [_, ...params].join("/");
+          }
         }
+      } else {
+        // format pathname
+        //url.pathname = [_, ...params].join("/");
       }
+      
     }
   }
 
@@ -141,4 +149,4 @@ async function providApi(request, env, url) {
   }
 }
 
-export { APIPaths, verifyPkey, providApi };
+export { APIPaths, verifyPath as verifyPath, providApi };

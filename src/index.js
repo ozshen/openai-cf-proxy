@@ -8,11 +8,11 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
-import { APIPaths, verifyPkey, providApi } from "./proxy-com";
+import { APIPaths, verifyPath, providApi } from "./proxy-com";
 import proxyCors from "./proxy-cors";
 import openaiApi from "./proxy-openai-offical";
 import azureApi from "./proxy-openai-azure";
-import palmApi from "./proxy-openai-palm";
+import geminiApi from "./proxy-openai-gemini";
 
 async function handleOptions(request) {
   let headers = request.headers;
@@ -42,7 +42,7 @@ async function handleRequest(request, env) {
   }
 
   // match route and verify pkey
-  const { route, url } = await verifyPkey(request, env);
+  const { route, url } = await verifyPath(request, env);
   switch (route) {
     case APIPaths.sysctl:
       return providApi(request, env, url);
@@ -50,8 +50,8 @@ async function handleRequest(request, env) {
       return openaiApi(request, env, url);
     case APIPaths.azure:
       return azureApi(request, env, url);
-    case APIPaths.palm:
-      return palmApi(request, env, url);
+    case APIPaths.gemini:
+      return geminiApi(request, env, url);
     default:
       return proxyCors(request, env, url);
   }

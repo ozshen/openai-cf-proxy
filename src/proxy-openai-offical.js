@@ -18,7 +18,7 @@ async function handler(request, env, url) {
   url.hostname = hostnames[Math.floor(Math.random() * hostnames.length)];
 
   if (!validPaths.some((prefix) => url.pathname.startsWith(prefix))) {
-    return new Response('{"error": {"message": "not allowed path","type": "invalid_request_error"}}\n', { status: 401 });
+    return new Response(`{"error": {"message": "not allowed path ${url.pathname}","type": "invalid_request_error"}}\n`, { status: 401 });
   }
 
   // Only pass body if request method is not 'GET'

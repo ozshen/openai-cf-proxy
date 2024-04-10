@@ -1,8 +1,10 @@
 # openai-cf-proxy
 
-利用Cloudflare Worker脚本快速代理OpenAI的官方API请求，并支持适配器，实现已接入OpenAI接口的项目无缝集成Azure OpenAI。
+_✨ Cloudflare Worker反代，通过标准的 OpenAI API 格式访问所有的大模型 ✨_
 
-<a href="./README.md">English</a> |
+利用Cloudflare Worker脚本快速代理OpenAI的官方API请求，支持将各类LLMs接口参数转换为OpenAI接口的标准格式，可无缝替代OpenAI接口。
+
+<a href="./README_en.md">English</a> |
 <a href="./README_zh.md">中文</a>
 
 ### 初始化Cloudflare Worker
