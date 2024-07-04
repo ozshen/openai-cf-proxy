@@ -1,0 +1,208 @@
+<script type="text/javascript">
+    
+//information
+var now = new URL(window.location.href);
+var path = now.pathname.substring(1);
+console.log("***************************----" + path);
+if(!path.startsWith("http")) path = "https://" + path;
+var base = now.host;
+var protocol = now.protocol;
+var nowlink = protocol + "//" + base + "/";
+var original_host = path.substring(path.indexOf("://") + "://".length);
+original_host = original_host.split('/')[0];
+var mainOnly = path.substring(0, path.indexOf("://")) + "://" + original_host + "/";
+
+function covScript(){ //由于observer经过测试不会hook添加的script标签，也可能是我测试有问题？
+  var scripts = document.getElementsByTagName('script');
+  for (var i = 0; i < scripts.length; i++) {
+    covToAbs(scripts[i]);
+  }
+    setTimeout(covScript, 3000);
+}
+function loopAndConvertToAbs(){
+  for(var ele of document.querySelectorAll('*')){
+    removeIntegrityAttributesFromElement(ele);
+    covToAbs(ele);
+  }
+  console.log("LOOPED EVERY ELEMENT");
+}
+function inject(){
+  //inject network request
+  var originalOpen = XMLHttpRequest.prototype.open;
+  var originalFetch = window.fetch;
+  XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
+    if(url.indexOf(nowlink) != 0){
+      var u = new URL(url, path).href;
+      u = u.replace(window.location.href, path);
+      u = u.replace(encodeURI(window.location.href), path);
+      u = u.replace(encodeURIComponent(window.location.href), path);
+
+      u = u.replace(nowlink, mainOnly);
+      u = u.replace(nowlink, encodeURI(mainOnly));
+      u = u.replace(nowlink, encodeURIComponent(mainOnly));
+      // mainOnly最后带/，要再替换一遍不带的
+      //反正是客户端执行，没人在乎那几毫秒，也没人在乎那0.01%的CPU占用。
+      u = u.replace(nowlink, mainOnly.substring(0,mainOnly.length - 1));
+      u = u.replace(nowlink, encodeURI(mainOnly.substring(0,mainOnly.length - 1)));
+      u = u.replace(nowlink, encodeURIComponent(mainOnly.substring(0,mainOnly.length - 1)));
+
+      u = u.replace(base, original_host);
+      url = nowlink + u;
+    }
+    console.log("R:" + url);
+    return originalOpen.apply(this, arguments);
+  };
+
+  window.fetch = function(input, init) {
+    var url;
+    if (typeof input === 'string') {
+      url = input;
+    } else if (input instanceof Request) {
+      url = input.url;
+    } else {
+      url = input;
+    }
+  
+    if (url.indexOf(nowlink) != 0) {
+      var u = new URL(url, path).href;
+      u = u.replace(window.location.href, path);
+      u = u.replace(encodeURI(window.location.href), path);
+      u = u.replace(encodeURIComponent(window.location.href), path);
+
+      u = u.replace(nowlink, mainOnly);
+      u = u.replace(nowlink, encodeURI(mainOnly));
+      u = u.replace(nowlink, encodeURIComponent(mainOnly));
+      // mainOnly最后带/，要再替换一遍不带的
+      //反正是客户端执行，没人在乎那几毫秒，也没人在乎那0.01%的CPU占用。
+      u = u.replace(nowlink, mainOnly.substring(0,mainOnly.length - 1));
+      u = u.replace(nowlink, encodeURI(mainOnly.substring(0,mainOnly.length - 1)));
+      u = u.replace(nowlink, encodeURIComponent(mainOnly.substring(0,mainOnly.length - 1)));
+
+      u = u.replace(base, original_host);
+      url = nowlink + u;
+    }
+    
+    console.log("R:" + url);
+    if (typeof input === 'string') {
+      return originalFetch(url, init);
+    } else {
+      const newRequest = new Request(url, input);
+      return originalFetch(newRequest, init);
+    }
+  };
+  
+  console.log("NETWORK REQUEST METHOD INJECTED");
+
+}
+var elementList = [];
+var separateTime;
+var timer;
+const SEPARATE = 800;
+
+function obsPage() {
+  var yProxyObserver = new MutationObserver(function(mutations) {
+    mutations.forEach(function(mutation) {
+      elementList.push(mutation.target);
+      separateTime = Date.now();
+      if (timer) {
+        clearTimeout(timer);
+      }
+      timer = setTimeout(yProxyHookCheck, SEPARATE);
+    });
+  });
+  var config = { attributes: true, childList: true, subtree: true };
+  yProxyObserver.observe(document.body, config);
+
+  console.log("OBSERVING THE WEBPAGE...");
+}
+
+function yProxyHookCheck() {
+  if (Date.now() - separateTime > SEPARATE - 10) {
+    console.log(elementList);
+    for (var ele of elementList) {
+      traverseAndConvert(ele);
+    }
+    elementList = [];
+  }
+}
+
+function covToAbs(element) {
+  var relativePath = "";
+  var setAttr = "";
+  if (element instanceof HTMLElement && element.hasAttribute("href")) {
+    relativePath = element.getAttribute("href");
+    setAttr = "href";
+  }
+  if (element instanceof HTMLElement && element.hasAttribute("src")) {
+    relativePath = element.getAttribute("src");
+    setAttr = "src";
+  }
+
+  // Check and update the attribute if necessary
+  if (setAttr !== "" && relativePath.indexOf(nowlink) != 0) { 
+    if (!relativePath.includes("*")) {
+      if (!relativePath.startsWith("data:") && !relativePath.startsWith("javascript:") && !relativePath.startsWith("chrome") && !relativePath.startsWith("edge")) {
+        try {
+          var absolutePath = new URL(relativePath, path).href;
+          absolutePath = nowlink + absolutePath;
+          console.log(absolutePath);
+          element.setAttribute(setAttr, absolutePath);
+        } catch (e) {
+          console.log(path + "   " + relativePath);
+        }
+      }
+    }
+  }
+}
+function removeIntegrityAttributesFromElement(element){
+  if (element.hasAttribute('integrity')) {
+    element.removeAttribute('integrity');
+  }
+}
+
+function traverseAndConvert(node) {
+  if (node instanceof HTMLElement) {
+    removeIntegrityAttributesFromElement(node);
+    covToAbs(node);
+    node.querySelectorAll('*').forEach(function(child) {
+      removeIntegrityAttributesFromElement(child);
+      covToAbs(child);
+    });
+  }
+}
+
+inject();
+
+//add change listener - new link
+window.addEventListener('load', () => {
+  loopAndConvertToAbs();
+  covScript();
+  console.log("CONVERTING SCRIPT PATH");
+  obsPage();
+});
+console.log("WINDOW ONLOAD EVENT ADDED");
+
+window.addEventListener('error', event => {
+  var element = event.target || event.srcElement;
+  if (element.tagName === 'SCRIPT') {
+    console.log('Found problematic script:', element);
+
+    // 调用 covToAbs 函数
+    removeIntegrityAttributesFromElement(element);
+    covToAbs(element);
+
+    // 创建新的 script 元素
+    var newScript = document.createElement('script');
+    newScript.src = element.src;
+    newScript.async = element.async; // 保留原有的 async 属性
+    newScript.defer = element.defer; // 保留原有的 defer 属性
+
+    // 添加新的 script 元素到 document
+    document.head.appendChild(newScript);
+
+    console.log('New script added:', newScript);
+  }
+}, true);
+console.log("WINDOW CORS ERROR EVENT ADDED");
+
+</script>

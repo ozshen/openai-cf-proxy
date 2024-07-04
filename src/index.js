@@ -8,11 +8,8 @@
  * Learn more at https://developers.cloudflare.com/workers/
  */
 
-import { APIPaths, verifyPath, providApi } from "./proxy-com";
-import proxyCors from "./proxy-cors";
-import openaiApi from "./proxy-openai-offical";
-import azureApi from "./proxy-openai-azure";
-import geminiApi from "./proxy-openai-gemini";
+import proxyComs from "./proxy-coms"; // verify enable
+import proxyCors from "./proxy-cors"; // verify disable
 
 async function handleOptions(request) {
   let headers = request.headers;
@@ -20,7 +17,7 @@ async function handleOptions(request) {
     const headersCors = {
       "access-control-allow-origin": headers.get("Origin") || "*",
       "Access-Control-Max-Age": "86400",
-      "access-control-allow-methods": "GET, HEAD, POST, OPTIONS",
+      "access-control-allow-methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
       "access-control-allow-headers": headers.get("Access-Control-Request-Headers") || "Content-Type, Authorization",
     };
 
@@ -41,19 +38,10 @@ async function handleRequest(request, env) {
     return handleOptions(request);
   }
 
-  // match route and verify pkey
-  const { route, url } = await verifyPath(request, env);
-  switch (route) {
-    case APIPaths.sysctl:
-      return providApi(request, env, url);
-    case APIPaths.openai:
-      return openaiApi(request, env, url);
-    case APIPaths.azure:
-      return azureApi(request, env, url);
-    case APIPaths.gemini:
-      return geminiApi(request, env, url);
-    default:
-      return proxyCors(request, env, url);
+  if (env && !!env.ENABLE_AUTH) {
+    return proxyComs(request, env);
+  } else {
+    return proxyCors(request);
   }
 
   //logger

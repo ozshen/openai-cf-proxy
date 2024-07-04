@@ -1,6 +1,6 @@
 {
   "name": "openai-cf-proxy",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "devDependencies": {
     "wrangler": "3.18.0"
   },

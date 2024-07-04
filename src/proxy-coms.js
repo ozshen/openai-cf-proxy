@@ -1,8 +1,14 @@
+import proxyCors from "./proxy-cors";
+import openaiApi from "./proxy-openai-offical";
+import azureApi from "./proxy-openai-azure";
+import geminiApi from "./proxy-openai-gemini";
+
 const APIPaths = {
   sysctl: "sysctl",
   openai: "openai",
   azure: "azure",
   gemini: "gemini",
+  proxy: "proxy",
 };
 
 async function listUser(env, params) {
@@ -77,54 +83,52 @@ async function generatePKey() {
 }
 
 //verify user's pkey
-async function verifyPath(request, env) {
+async function verifyUrl(request, env) {
   const url = new URL(request.url);
-  url.pathname = url.pathname.replace("//", "/");
   const [_, p1, p2, ...params] = url.pathname.split("/");
-  const routePath = (p1 || "").toLowerCase();
-  const uacpkey = p2;
 
   // match APIPaths
-  if (Object.values(APIPaths).some((prefix) => routePath.startsWith(prefix))) {
-    if (routePath === APIPaths.sysctl) {
-      // format pathname
-      url.pathname = [_, ...params].join("/");
+  if (p1 && Object.values(APIPaths).some((prefix) => p1.startsWith(prefix))) {
+    const uacpkey = p2 || ""; //pkey
+    if (p1 === APIPaths.sysctl) {
 
       if (!env.SYS_SECRERT || uacpkey !== env.SYS_SECRERT) {
         throw "invalid uac pkey";
       }
+
       console.log(`pkey: ${uacpkey}`);
-      
-    } else {
 
-      if(env?.KV){
-        // format pathname
-        url.pathname = [_, p2, ...params].join("/");
+      // format pathname
+      url.pathname = [_, ...params].join("/");
+      return { route: p1, url };
+    } else if(env.KV){
+      // verify uac
+      const users = (await env.KV.get("users", { type: "json" })) || {};
+      if (users) {
+        const uname = url.host;
+        const ulist = Object.keys(users);
+        if (ulist.length > 0) {
+          if (!users[uname]) throw "invalid uac name";
+          if (!uacpkey) throw "invalid uac pkey";
+          if (uacpkey.toLowerCase() !== users[uname].key.toLowerCase()) throw "uac pkey required";
 
-        // verify uac
-        const users = (await env.KV.get("users", { type: "json" })) || {};
-        if (users) {
-          let uname = url.host;
-          var ulist = Object.keys(users);
-          if (ulist.length > 0) {
-            if (!users[uname]) throw "invalid uac name";
-            if (!uacpkey) throw "invalid uac pkey";
-            if (uacpkey.toLowerCase() != users[uname].key.toLowerCase()) throw "uac pkey required";
+          console.log(`name ${uname} acepted, pkey: ${uacpkey}`);
 
-            console.log(`name ${uname} acepted, pkey: ${uacpkey}`);
-            // format pathname
-            url.pathname = [_, ...params].join("/");
-          }
+          // format pathname
+          url.pathname = [_, ...params].join("/");
+          return { route: p1, url };
         }
       } else {
-        // format pathname
-        //url.pathname = [_, ...params].join("/");
+        throw "invalid users";
       }
       
+    } else {
+      // format pathname
+      url.pathname = [_, p2, ...params].join("/");
     }
   }
 
-  return { route: routePath, url };
+  return { route: undefined, url };
 }
 
 // uac controller api
@@ -149,4 +153,23 @@ async function providApi(request, env, url) {
   }
 }
 
-export { APIPaths, verifyPath as verifyPath, providApi };
+async function handler(request, env) {
+  // match route and verify pkey
+  const { route, url } = await verifyUrl(request, env);
+  switch (route) {
+    case APIPaths.sysctl:
+      return providApi(request, env, url);
+    case APIPaths.openai:
+      return openaiApi(request, env, url);
+    case APIPaths.azure:
+      return azureApi(request, env, url);
+    case APIPaths.gemini:
+      return geminiApi(request, env, url);
+    case APIPaths.proxy:
+      return proxyCors(request, url);
+  }
+
+  return new Response(null, { status: 444 });
+}
+
+export default handler;
